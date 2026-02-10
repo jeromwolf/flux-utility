@@ -8,6 +8,15 @@ export const tools: ToolDefinition[] = [
     icon: 'FileImage',
     href: '/tools/pdf-to-image',
     category: 'PDF',
+    isNew: false,
+  },
+  {
+    id: 'image-to-pdf',
+    name: 'Image to PDF',
+    description: 'JPG, PNG, GIF 이미지를 하나의 PDF 파일로 합칩니다. 순서 변경 가능.',
+    icon: 'FileUp',
+    href: '/tools/image-to-pdf',
+    category: 'PDF',
     isNew: true,
   },
 ];
