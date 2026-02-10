@@ -15,55 +15,64 @@ export function ImageList({ images, onRemove, onMoveUp, onMoveDown }: ImageListP
   if (images.length === 0) return null;
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <p className="text-sm text-muted-foreground">{images.length}개 이미지</p>
-      <div className="space-y-2">
+      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
         {images.map((img, index) => (
           <div
             key={img.id}
-            className="flex items-center gap-3 rounded-xl border border-border bg-card p-3"
+            className="group relative overflow-hidden rounded-xl border border-border bg-card"
           >
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-medium text-muted-foreground">
+            {/* Number badge */}
+            <span className="absolute top-2 left-2 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-black/60 text-xs font-bold text-white">
               {index + 1}
             </span>
-            <img
-              src={img.previewUrl}
-              alt={`이미지 ${index + 1}`}
-              className="h-12 w-16 shrink-0 rounded-lg object-cover"
-            />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">{img.file.name}</p>
-              <p className="text-xs text-muted-foreground">
-                {img.width} x {img.height}px &middot; {(img.file.size / 1024).toFixed(0)}KB
-              </p>
-            </div>
-            <div className="flex shrink-0 items-center gap-1">
+
+            {/* Controls overlay */}
+            <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
               <button
                 onClick={() => onMoveUp(img.id)}
                 disabled={index === 0}
                 className={cn(
-                  'rounded-lg p-1.5 transition-colors hover:bg-muted',
+                  'flex h-7 w-7 items-center justify-center rounded-lg bg-black/60 text-white transition-colors hover:bg-black/80',
                   index === 0 && 'pointer-events-none opacity-30'
                 )}
               >
-                <ArrowUp className="h-4 w-4" />
+                <ArrowUp className="h-3.5 w-3.5" />
               </button>
               <button
                 onClick={() => onMoveDown(img.id)}
                 disabled={index === images.length - 1}
                 className={cn(
-                  'rounded-lg p-1.5 transition-colors hover:bg-muted',
+                  'flex h-7 w-7 items-center justify-center rounded-lg bg-black/60 text-white transition-colors hover:bg-black/80',
                   index === images.length - 1 && 'pointer-events-none opacity-30'
                 )}
               >
-                <ArrowDown className="h-4 w-4" />
+                <ArrowDown className="h-3.5 w-3.5" />
               </button>
               <button
                 onClick={() => onRemove(img.id)}
-                className="rounded-lg p-1.5 text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-950"
+                className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-600/80 text-white transition-colors hover:bg-red-600"
               >
-                <X className="h-4 w-4" />
+                <X className="h-3.5 w-3.5" />
               </button>
+            </div>
+
+            {/* Image preview */}
+            <div className="aspect-[4/3] bg-muted">
+              <img
+                src={img.previewUrl}
+                alt={`이미지 ${index + 1}`}
+                className="h-full w-full object-contain"
+              />
+            </div>
+
+            {/* File info */}
+            <div className="border-t border-border px-2.5 py-1.5">
+              <p className="truncate text-xs font-medium">{img.file.name}</p>
+              <p className="text-[10px] text-muted-foreground">
+                {img.width}x{img.height} · {(img.file.size / 1024).toFixed(0)}KB
+              </p>
             </div>
           </div>
         ))}
