@@ -35,7 +35,7 @@ export const tools: ToolDefinition[] = [
     icon: 'Eraser',
     href: '/tools/bg-remove',
     category: 'Image',
-    isNew: true,
+    isNew: false,
   },
   {
     id: 'image-resize',
@@ -44,7 +44,7 @@ export const tools: ToolDefinition[] = [
     icon: 'Scaling',
     href: '/tools/image-resize',
     category: 'Image',
-    isNew: true,
+    isNew: false,
   },
   {
     id: 'qr-generator',
@@ -53,6 +53,15 @@ export const tools: ToolDefinition[] = [
     icon: 'QrCode',
     href: '/tools/qr-generator',
     category: 'Utility',
+    isNew: false,
+  },
+  {
+    id: 'pdf-annotate',
+    name: 'PDF 강의 도구',
+    description: 'PDF 위에 그림, 메모, 형광펜을 추가하고 저장합니다.',
+    icon: 'PenTool',
+    href: '/tools/pdf-annotate',
+    category: 'PDF',
     isNew: true,
   },
 ];
