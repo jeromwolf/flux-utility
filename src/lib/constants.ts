@@ -17,6 +17,15 @@ export const tools: ToolDefinition[] = [
     icon: 'FileUp',
     href: '/tools/image-to-pdf',
     category: 'PDF',
+    isNew: false,
+  },
+  {
+    id: 'video-scene-detect',
+    name: 'Video Scene Detect',
+    description: '동영상에서 장면이 바뀌는 시점을 자동으로 감지합니다.',
+    icon: 'ScanSearch',
+    href: '/tools/video-scene-detect',
+    category: 'Video',
     isNew: true,
   },
 ];
