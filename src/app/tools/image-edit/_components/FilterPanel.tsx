@@ -28,7 +28,7 @@ export function FilterPanel({ image, activeFilter, onFilterChange }: FilterPanel
         return;
       }
       const preset = FILTER_PRESETS[index];
-      const canvas = generateFilterPreview(image, preset, 80);
+      const canvas = generateFilterPreview(image, preset, 160);
       map.set(preset.id, canvas.toDataURL('image/jpeg', 0.7));
       index++;
       // Set intermediate previews so they appear one by one
@@ -42,13 +42,13 @@ export function FilterPanel({ image, activeFilter, onFilterChange }: FilterPanel
   return (
     <div className="space-y-3">
       <h3 className="text-sm font-medium">필터</h3>
-      <div className="grid grid-cols-5 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         {FILTER_PRESETS.map((preset) => (
           <button
             key={preset.id}
             onClick={() => onFilterChange(preset)}
             className={cn(
-              'flex flex-col items-center gap-1 rounded-lg p-1.5 transition-colors',
+              'flex flex-col items-center gap-1.5 rounded-lg p-2 transition-colors',
               activeFilter === preset.id
                 ? 'bg-primary/10 ring-2 ring-primary'
                 : 'hover:bg-muted'
@@ -58,12 +58,12 @@ export function FilterPanel({ image, activeFilter, onFilterChange }: FilterPanel
               <img
                 src={previews.get(preset.id)}
                 alt={preset.name}
-                className="h-14 w-14 rounded-md object-cover"
+                className="w-full aspect-square rounded-md object-cover"
               />
             ) : (
-              <div className="h-14 w-14 rounded-md bg-muted animate-pulse" />
+              <div className="w-full aspect-square rounded-md bg-muted animate-pulse" />
             )}
-            <span className="text-[10px] text-muted-foreground">{preset.name}</span>
+            <span className="text-xs text-muted-foreground">{preset.name}</span>
           </button>
         ))}
       </div>
