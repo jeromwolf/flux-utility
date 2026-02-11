@@ -62,6 +62,15 @@ export const tools: ToolDefinition[] = [
     icon: 'PenTool',
     href: '/tools/pdf-annotate',
     category: 'PDF',
+    isNew: false,
+  },
+  {
+    id: 'image-edit',
+    name: '이미지 편집기',
+    description: '밝기, 대비, 채도 조정과 인스타 스타일 필터, 크롭 기능.',
+    icon: 'ImageIcon',
+    href: '/tools/image-edit',
+    category: 'Image',
     isNew: true,
   },
 ];
