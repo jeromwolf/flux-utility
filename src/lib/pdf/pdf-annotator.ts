@@ -4,7 +4,7 @@ import { jsPDF } from 'jspdf';
 // Types
 // ---------------------------------------------------------------------------
 
-export type AnnotationTool = 'pen' | 'highlight' | 'text' | 'eraser' | 'rect' | 'circle' | 'arrow' | 'line';
+export type AnnotationTool = 'pen' | 'highlight' | 'text' | 'eraser' | 'rect' | 'circle' | 'arrow' | 'line' | 'laser';
 
 export interface PenStroke {
   tool: 'pen';

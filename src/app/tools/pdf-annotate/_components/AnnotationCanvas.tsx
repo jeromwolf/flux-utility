@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import type { Annotation, AnnotationTool } from '@/lib/pdf/pdf-annotator';
 import { drawAllAnnotations } from '@/lib/pdf/pdf-annotator';
 
@@ -24,9 +24,10 @@ const CURSOR_MAP: Record<AnnotationTool, string> = {
   circle: 'crosshair',
   arrow: 'crosshair',
   line: 'crosshair',
+  laser: 'crosshair',
 };
 
-export function AnnotationCanvas({
+export const AnnotationCanvas = forwardRef<HTMLCanvasElement, AnnotationCanvasProps>(function AnnotationCanvas({
   width,
   height,
   activeTool,
@@ -35,21 +36,90 @@ export function AnnotationCanvas({
   fontSize,
   annotations,
   onAddAnnotation,
-}: AnnotationCanvasProps) {
+}, forwardedRef) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Expose canvas element to parent (e.g. for recording)
+  useImperativeHandle(forwardedRef, () => canvasRef.current as HTMLCanvasElement);
   const isDrawing = useRef(false);
   const currentPoints = useRef<[number, number][]>([]);
   const shapeStart = useRef<[number, number] | null>(null);
   const lastPoint = useRef<[number, number]>([0, 0]);
 
-  // Redraw all annotations whenever they change
+  // Laser pointer ephemeral strokes
+  const [laserStrokes, setLaserStrokes] = useState<
+    { points: [number, number][]; createdAt: number; opacity: number }[]
+  >([]);
+  const animFrameRef = useRef<number>(0);
+
+  // Redraw all annotations + laser strokes whenever they change
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+
+    // Draw permanent annotations
     drawAllAnnotations(ctx, annotations);
-  }, [annotations]);
+
+    // Draw laser strokes on top
+    laserStrokes.forEach(stroke => {
+      if (stroke.opacity <= 0) return;
+      ctx.save();
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 8;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.globalAlpha = stroke.opacity * 0.6;
+
+      if (stroke.points.length > 0) {
+        ctx.beginPath();
+        ctx.moveTo(stroke.points[0][0], stroke.points[0][1]);
+        for (let i = 1; i < stroke.points.length; i++) {
+          ctx.lineTo(stroke.points[i][0], stroke.points[i][1]);
+        }
+        if (stroke.points.length === 1) {
+          ctx.lineTo(stroke.points[0][0] + 0.1, stroke.points[0][1] + 0.1);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
+    });
+  }, [annotations, laserStrokes]);
+
+  // Laser fade animation loop
+  const hasLaserStrokes = laserStrokes.length > 0;
+
+  useEffect(() => {
+    if (!hasLaserStrokes) return;
+
+    const FADE_DURATION = 2000; // 2 seconds
+
+    const animate = () => {
+      const now = Date.now();
+
+      setLaserStrokes(prev => {
+        const updated = prev
+          .map(stroke => ({
+            ...stroke,
+            opacity: Math.max(0, 1 - (now - stroke.createdAt) / FADE_DURATION),
+          }))
+          .filter(stroke => stroke.opacity > 0);
+        return updated;
+      });
+
+      animFrameRef.current = requestAnimationFrame(animate);
+    };
+
+    animFrameRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+      }
+    };
+  }, [hasLaserStrokes]);
 
   const getCanvasPoint = useCallback(
     (e: React.PointerEvent<HTMLCanvasElement>): [number, number] => {
@@ -80,6 +150,13 @@ export function AnnotationCanvas({
             fontSize,
           });
         }
+        return;
+      }
+
+      if (activeTool === 'laser') {
+        isDrawing.current = true;
+        currentPoints.current = [point];
+        canvasRef.current?.setPointerCapture(e.pointerId);
         return;
       }
 
@@ -193,6 +270,13 @@ export function AnnotationCanvas({
         ctx.lineWidth = strokeWidth;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
+      } else if (activeTool === 'laser') {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 8;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.globalAlpha = 0.6;
       }
 
       const pts = currentPoints.current;
@@ -236,6 +320,19 @@ export function AnnotationCanvas({
       return;
     }
 
+    if (activeTool === 'laser') {
+      const pts = currentPoints.current;
+      if (pts.length > 0) {
+        setLaserStrokes(prev => [...prev, {
+          points: [...pts] as [number, number][],
+          createdAt: Date.now(),
+          opacity: 1.0,
+        }]);
+      }
+      currentPoints.current = [];
+      return;
+    }
+
     const pts = currentPoints.current;
     if (pts.length === 0) return;
 
@@ -271,4 +368,4 @@ export function AnnotationCanvas({
       }}
     />
   );
-}
+});

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { PenTool, RotateCcw } from 'lucide-react';
 import { saveAs } from 'file-saver';
 import { Button } from '@/components/ui/Button';
@@ -13,6 +13,8 @@ import { exportAnnotatedPdf } from '@/lib/pdf/pdf-annotator';
 import { Toolbar } from './_components/Toolbar';
 import { AnnotationCanvas } from './_components/AnnotationCanvas';
 import { PageNavigator } from './_components/PageNavigator';
+import { LectureRecorder } from '@/lib/pdf/lecture-recorder';
+import { RecordingControls } from './_components/RecordingControls';
 
 type Status = 'idle' | 'loading' | 'ready' | 'saving';
 
@@ -45,6 +47,14 @@ export default function PdfAnnotatePage() {
   const [color, setColor] = useState('#000000');
   const [strokeWidth, setStrokeWidth] = useState(8);
   const [fontSize, setFontSize] = useState(36);
+
+  // Annotation canvas ref (for recording capture)
+  const annotationCanvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Recording state
+  const recorderRef = useRef<LectureRecorder | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
 
   // ------------------------------------------------------------------
   // File handling
@@ -203,10 +213,78 @@ export default function PdfAnnotatePage() {
   }, [annotations]);
 
   // ------------------------------------------------------------------
+  // Recording
+  // ------------------------------------------------------------------
+
+  // Feed current frame to recorder on page/annotation changes
+  useEffect(() => {
+    if (!recorderRef.current?.isRecording) return;
+    const pdfCanvas = pdfCanvasesRef.current[currentPage - 1];
+    const annotCanvas = annotationCanvasRef.current;
+    if (pdfCanvas && annotCanvas) {
+      recorderRef.current.updateFrame(pdfCanvas, pdfCanvas.width, pdfCanvas.height, annotCanvas);
+    }
+  }, [currentPage, annotations, isRecording]);
+
+  // Continuous frame feed during recording (for live annotation capture)
+  useEffect(() => {
+    if (!isRecording) return;
+
+    let animId: number;
+    const feedFrame = () => {
+      const pdfCanvas = pdfCanvasesRef.current[currentPage - 1];
+      const annotCanvas = annotationCanvasRef.current;
+      if (recorderRef.current && pdfCanvas && annotCanvas) {
+        recorderRef.current.updateFrame(pdfCanvas, pdfCanvas.width, pdfCanvas.height, annotCanvas);
+      }
+      animId = requestAnimationFrame(feedFrame);
+    };
+    animId = requestAnimationFrame(feedFrame);
+
+    return () => cancelAnimationFrame(animId);
+  }, [isRecording, currentPage]);
+
+  const handleStartRecording = useCallback(async () => {
+    const recorder = new LectureRecorder();
+    recorderRef.current = recorder;
+
+    // Set initial frame
+    const pdfCanvas = pdfCanvasesRef.current[currentPage - 1];
+    const annotCanvas = annotationCanvasRef.current;
+    if (pdfCanvas && annotCanvas) {
+      recorder.updateFrame(pdfCanvas, pdfCanvas.width, pdfCanvas.height, annotCanvas);
+    }
+
+    await recorder.start();
+    setIsRecording(true);
+    setRecordedBlob(null);
+  }, [currentPage]);
+
+  const handleStopRecording = useCallback(async () => {
+    if (!recorderRef.current) return;
+    const blob = await recorderRef.current.stop();
+    recorderRef.current.dispose();
+    recorderRef.current = null;
+    setIsRecording(false);
+    setRecordedBlob(blob);
+  }, []);
+
+  const handleDownloadRecording = useCallback(() => {
+    if (!recordedBlob) return;
+    saveAs(recordedBlob, 'lecture.webm');
+  }, [recordedBlob]);
+
+  // ------------------------------------------------------------------
   // Reset
   // ------------------------------------------------------------------
 
   const reset = useCallback(() => {
+    if (recorderRef.current) {
+      recorderRef.current.dispose();
+      recorderRef.current = null;
+    }
+    setIsRecording(false);
+    setRecordedBlob(null);
     pdfRef.current = null;
     pdfCanvasesRef.current = [];
     setPageDataUrls([]);
@@ -307,6 +385,7 @@ export default function PdfAnnotatePage() {
                 draggable={false}
               />
               <AnnotationCanvas
+                ref={annotationCanvasRef}
                 width={pdfCanvasesRef.current[currentPage - 1]?.width ?? 0}
                 height={pdfCanvasesRef.current[currentPage - 1]?.height ?? 0}
                 activeTool={activeTool}
@@ -327,6 +406,15 @@ export default function PdfAnnotatePage() {
             onNextPage={() => setCurrentPage((p) => Math.min(numPages, p + 1))}
             onSave={handleSave}
             isSaving={status === 'saving'}
+          />
+
+          {/* Recording Controls */}
+          <RecordingControls
+            isRecording={isRecording}
+            recordedBlob={recordedBlob}
+            onStartRecording={handleStartRecording}
+            onStopRecording={handleStopRecording}
+            onDownload={handleDownloadRecording}
           />
         </div>
       )}

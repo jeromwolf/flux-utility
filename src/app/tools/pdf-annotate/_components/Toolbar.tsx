@@ -1,6 +1,6 @@
 'use client';
 
-import { Pencil, Highlighter, Type, Eraser, Undo2, Redo2, Square, Circle, MoveRight, Minus } from 'lucide-react';
+import { Pencil, Highlighter, Type, Eraser, Undo2, Redo2, Square, Circle, MoveRight, Minus, Crosshair } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AnnotationTool } from '@/lib/pdf/pdf-annotator';
 
@@ -27,6 +27,7 @@ const TOOLS: { tool: AnnotationTool; icon: typeof Pencil; label: string }[] = [
   { tool: 'rect', icon: Square, label: '사각형' },
   { tool: 'circle', icon: Circle, label: '원' },
   { tool: 'text', icon: Type, label: '텍스트' },
+  { tool: 'laser', icon: Crosshair, label: '레이저 포인터' },
   { tool: 'eraser', icon: Eraser, label: '지우개' },
 ];
 
