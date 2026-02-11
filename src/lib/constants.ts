@@ -71,6 +71,15 @@ export const tools: ToolDefinition[] = [
     icon: 'ImageIcon',
     href: '/tools/image-edit',
     category: 'Image',
+    isNew: false,
+  },
+  {
+    id: 'stock-image',
+    name: '무료 이미지/동영상',
+    description: 'Pixabay에서 무료 이미지와 동영상을 검색하고 다운로드합니다.',
+    icon: 'Search',
+    href: '/tools/stock-image',
+    category: 'Search',
     isNew: true,
   },
 ];
