@@ -4,10 +4,10 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import type { CropRect } from '@/lib/image/image-editor';
 
 interface CropOverlayProps {
-  imageWidth: number;   // display width of the image
-  imageHeight: number;  // display height of the image
-  naturalWidth: number;  // actual image pixel width
-  naturalHeight: number; // actual image pixel height
+  imageWidth: number;
+  imageHeight: number;
+  naturalWidth: number;
+  naturalHeight: number;
   onCropChange: (crop: CropRect | null) => void;
   active: boolean;
 }
@@ -20,20 +20,28 @@ export function CropOverlay({
   onCropChange,
   active,
 }: CropOverlayProps) {
-  // Crop in DISPLAY coordinates
-  const [crop, setCrop] = useState({ x: 0, y: 0, width: imageWidth, height: imageHeight });
+  const [crop, setCrop] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  const cropRef = useRef(crop);
   const isDragging = useRef(false);
   const dragType = useRef<'move' | 'nw' | 'ne' | 'sw' | 'se' | null>(null);
   const dragStart = useRef({ x: 0, y: 0 });
   const cropStart = useRef({ x: 0, y: 0, width: 0, height: 0 });
 
+  // Keep ref in sync with state
+  useEffect(() => {
+    cropRef.current = crop;
+  }, [crop]);
+
   // Reset crop when image dimensions change
   useEffect(() => {
-    setCrop({ x: 0, y: 0, width: imageWidth, height: imageHeight });
-    onCropChange(null);
-  }, [imageWidth, imageHeight]);
+    if (imageWidth > 0 && imageHeight > 0) {
+      const newCrop = { x: 0, y: 0, width: imageWidth, height: imageHeight };
+      setCrop(newCrop);
+      cropRef.current = newCrop;
+      onCropChange(null);
+    }
+  }, [imageWidth, imageHeight, onCropChange]);
 
-  // Convert display crop to natural pixel crop
   const toNaturalCrop = useCallback((c: typeof crop): CropRect => {
     const scaleX = naturalWidth / imageWidth;
     const scaleY = naturalHeight / imageHeight;
@@ -45,27 +53,25 @@ export function CropOverlay({
     };
   }, [imageWidth, imageHeight, naturalWidth, naturalHeight]);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent, type: typeof dragType.current) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleStart = useCallback((clientX: number, clientY: number, type: typeof dragType.current) => {
     isDragging.current = true;
     dragType.current = type;
-    dragStart.current = { x: e.clientX, y: e.clientY };
-    cropStart.current = { ...crop };
-  }, [crop]);
+    dragStart.current = { x: clientX, y: clientY };
+    cropStart.current = { ...cropRef.current };
+  }, []);
 
   useEffect(() => {
     if (!active) return;
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const handleMove = (clientX: number, clientY: number) => {
       if (!isDragging.current || !dragType.current) return;
 
-      const dx = e.clientX - dragStart.current.x;
-      const dy = e.clientY - dragStart.current.y;
+      const dx = clientX - dragStart.current.x;
+      const dy = clientY - dragStart.current.y;
       const s = cropStart.current;
       const MIN_SIZE = 20;
 
-      let newCrop = { ...s };
+      const newCrop = { ...s };
 
       if (dragType.current === 'move') {
         newCrop.x = Math.max(0, Math.min(imageWidth - s.width, s.x + dx));
@@ -74,61 +80,93 @@ export function CropOverlay({
         newCrop.width = Math.max(MIN_SIZE, Math.min(imageWidth - s.x, s.width + dx));
         newCrop.height = Math.max(MIN_SIZE, Math.min(imageHeight - s.y, s.height + dy));
       } else if (dragType.current === 'sw') {
-        const newX = Math.max(0, s.x + dx);
-        newCrop.x = newX;
-        newCrop.width = Math.max(MIN_SIZE, s.width - (newX - s.x));
+        const newW = Math.max(MIN_SIZE, s.width - dx);
+        const newX = s.x + s.width - newW;
+        newCrop.x = Math.max(0, newX);
+        newCrop.width = newW;
         newCrop.height = Math.max(MIN_SIZE, Math.min(imageHeight - s.y, s.height + dy));
       } else if (dragType.current === 'ne') {
         newCrop.width = Math.max(MIN_SIZE, Math.min(imageWidth - s.x, s.width + dx));
-        const newY = Math.max(0, s.y + dy);
-        newCrop.y = newY;
-        newCrop.height = Math.max(MIN_SIZE, s.height - (newY - s.y));
+        const newH = Math.max(MIN_SIZE, s.height - dy);
+        const newY = s.y + s.height - newH;
+        newCrop.y = Math.max(0, newY);
+        newCrop.height = newH;
       } else if (dragType.current === 'nw') {
-        const newX = Math.max(0, s.x + dx);
-        const newY = Math.max(0, s.y + dy);
-        newCrop.x = newX;
-        newCrop.y = newY;
-        newCrop.width = Math.max(MIN_SIZE, s.width - (newX - s.x));
-        newCrop.height = Math.max(MIN_SIZE, s.height - (newY - s.y));
+        const newW = Math.max(MIN_SIZE, s.width - dx);
+        const newX = s.x + s.width - newW;
+        const newH = Math.max(MIN_SIZE, s.height - dy);
+        const newY = s.y + s.height - newH;
+        newCrop.x = Math.max(0, newX);
+        newCrop.y = Math.max(0, newY);
+        newCrop.width = newW;
+        newCrop.height = newH;
       }
 
       setCrop(newCrop);
+      cropRef.current = newCrop;
     };
 
-    const handleMouseUp = () => {
+    const handleEnd = () => {
       if (isDragging.current) {
         isDragging.current = false;
         dragType.current = null;
-        // Emit crop in natural coordinates
-        onCropChange(toNaturalCrop(crop));
+        onCropChange(toNaturalCrop(cropRef.current));
       }
     };
 
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+    // Mouse events
+    const onMouseMove = (e: MouseEvent) => handleMove(e.clientX, e.clientY);
+    const onMouseUp = () => handleEnd();
+
+    // Touch events
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        e.preventDefault();
+        handleMove(e.touches[0].clientX, e.touches[0].clientY);
+      }
     };
-  }, [active, crop, imageWidth, imageHeight, toNaturalCrop, onCropChange]);
+    const onTouchEnd = () => handleEnd();
 
-  if (!active) return null;
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    window.addEventListener('touchmove', onTouchMove, { passive: false });
+    window.addEventListener('touchend', onTouchEnd);
 
-  // Corner handle component
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [active, imageWidth, imageHeight, toNaturalCrop, onCropChange]);
+
+  if (!active || imageWidth <= 0 || imageHeight <= 0) return null;
+
+  const handleMouseDown = (e: React.MouseEvent, type: typeof dragType.current) => {
+    e.preventDefault();
+    e.stopPropagation();
+    handleStart(e.clientX, e.clientY, type);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent, type: typeof dragType.current) => {
+    e.stopPropagation();
+    if (e.touches.length === 1) {
+      handleStart(e.touches[0].clientX, e.touches[0].clientY, type);
+    }
+  };
+
   const Handle = ({ position, className }: { position: 'nw' | 'ne' | 'sw' | 'se'; className: string }) => (
     <div
       onMouseDown={(e) => handleMouseDown(e, position)}
+      onTouchStart={(e) => handleTouchStart(e, position)}
       className={`absolute h-4 w-4 rounded-full border-2 border-white bg-primary shadow-md ${className}`}
       style={{ cursor: `${position}-resize` }}
     />
   );
 
   return (
-    <div className="absolute inset-0" style={{ zIndex: 20 }}>
-      {/* Dark overlay outside crop area */}
-      <div className="absolute inset-0 bg-black/50" />
-
-      {/* Crop area (clear) */}
+    <div className="absolute inset-0" style={{ zIndex: 20, touchAction: 'none' }}>
+      {/* Crop area with box-shadow mask (single layer - no double overlay) */}
       <div
         style={{
           position: 'absolute',
@@ -137,15 +175,13 @@ export function CropOverlay({
           width: crop.width,
           height: crop.height,
           cursor: 'move',
+          boxShadow: '0 0 0 9999px rgba(0,0,0,0.5)',
         }}
         onMouseDown={(e) => handleMouseDown(e, 'move')}
+        onTouchStart={(e) => handleTouchStart(e, 'move')}
       >
-        {/* Clear the dark overlay in the crop area */}
-        <div className="absolute inset-0 bg-white/0 ring-2 ring-white"
-          style={{
-            boxShadow: `0 0 0 9999px rgba(0,0,0,0.5)`,
-          }}
-        />
+        {/* White border */}
+        <div className="absolute inset-0 ring-2 ring-white pointer-events-none" />
 
         {/* Grid lines (rule of thirds) */}
         <div className="absolute inset-0 pointer-events-none">

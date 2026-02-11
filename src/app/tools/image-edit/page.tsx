@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { ImageIcon, RotateCcw, Download, Crop, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { saveAs } from 'file-saver';
 import { Button } from '@/components/ui/Button';
 import { FileUpload } from '@/components/ui/FileUpload';
 import {
   loadImage,
+  buildFilterString,
   applyAdjustments,
   applyCrop,
   exportImage,
@@ -23,9 +24,11 @@ type Tab = 'adjust' | 'filter' | 'crop';
 export default function ImageEditPage() {
   // Image state
   const [image, setImage] = useState<HTMLImageElement | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [fileName, setFileName] = useState('');
+  const [originalFormat, setOriginalFormat] = useState<'image/jpeg' | 'image/png'>('image/jpeg');
   const imageContainerRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
   const [displaySize, setDisplaySize] = useState({ width: 0, height: 0 });
 
   // Edit state
@@ -44,6 +47,15 @@ export default function ImageEditPage() {
       const img = await loadImage(file);
       setImage(img);
       setFileName(file.name.replace(/\.[^.]+$/, ''));
+      setOriginalFormat(file.type === 'image/png' ? 'image/png' : 'image/jpeg');
+
+      // Generate display URL once (img.src was revoked in loadImage, so draw to canvas)
+      const previewCanvas = document.createElement('canvas');
+      previewCanvas.width = img.naturalWidth;
+      previewCanvas.height = img.naturalHeight;
+      previewCanvas.getContext('2d')!.drawImage(img, 0, 0);
+      setImageUrl(previewCanvas.toDataURL('image/jpeg', 0.9));
+
       setAdjustments({ ...DEFAULT_ADJUSTMENTS });
       setActiveFilter(FILTER_PRESETS[0]);
       setCropRect(null);
@@ -54,34 +66,37 @@ export default function ImageEditPage() {
   }, []);
 
   // ------------------------------------------------------------------
-  // Preview generation
+  // CSS filter for live preview (no canvas needed per frame!)
   // ------------------------------------------------------------------
 
-  useEffect(() => {
-    if (!image) return;
+  const previewFilter = useMemo(() => {
+    const adj: Adjustments = { ...adjustments };
+    if (activeFilter.id !== 'original' && activeFilter.adjustments) {
+      Object.assign(adj, activeFilter.adjustments);
+    }
+    return buildFilterString(adj);
+  }, [adjustments, activeFilter]);
 
-    // Apply adjustments + filter
-    const canvas = applyAdjustments(image, adjustments, activeFilter);
-    setPreviewUrl(canvas.toDataURL('image/jpeg', 0.85));
-  }, [image, adjustments, activeFilter]);
+  const mergedVignette = useMemo(() => {
+    if (activeFilter.id !== 'original' && activeFilter.adjustments?.vignette !== undefined) {
+      return activeFilter.adjustments.vignette;
+    }
+    return adjustments.vignette;
+  }, [adjustments.vignette, activeFilter]);
 
-  // Track display size for crop overlay
+  // Track display size for crop overlay (observe the img element directly)
   useEffect(() => {
-    if (!imageContainerRef.current) return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const img = entry.target.querySelector('img');
-        if (img) {
-          setDisplaySize({ width: img.clientWidth, height: img.clientHeight });
-        }
-      }
+    const imgEl = imgRef.current;
+    if (!imgEl) return;
+    const observer = new ResizeObserver(() => {
+      setDisplaySize({ width: imgEl.clientWidth, height: imgEl.clientHeight });
     });
-    observer.observe(imageContainerRef.current);
+    observer.observe(imgEl);
     return () => observer.disconnect();
-  }, [previewUrl]);
+  }, [imageUrl]);
 
   // ------------------------------------------------------------------
-  // Save
+  // Save (full-res canvas rendering only on save)
   // ------------------------------------------------------------------
 
   const handleSave = useCallback(async () => {
@@ -89,20 +104,25 @@ export default function ImageEditPage() {
     setIsSaving(true);
 
     try {
-      let result = applyAdjustments(image, adjustments, activeFilter);
+      const adj: Adjustments = { ...adjustments };
+      if (activeFilter.id !== 'original' && activeFilter.adjustments) {
+        Object.assign(adj, activeFilter.adjustments);
+      }
+      let result = applyAdjustments(image, { ...DEFAULT_ADJUSTMENTS, ...adj }, activeFilter);
 
       if (cropRect) {
         result = applyCrop(result, cropRect);
       }
 
-      const blob = await exportImage(result, 'image/jpeg', 0.92);
-      saveAs(blob, `${fileName || 'edited'}.jpg`);
+      const ext = originalFormat === 'image/png' ? 'png' : 'jpg';
+      const blob = await exportImage(result, originalFormat, 0.92);
+      saveAs(blob, `${fileName || 'edited'}.${ext}`);
     } catch (err) {
       alert(err instanceof Error ? err.message : '저장에 실패했습니다.');
     } finally {
       setIsSaving(false);
     }
-  }, [image, adjustments, activeFilter, cropRect, fileName]);
+  }, [image, adjustments, activeFilter, cropRect, fileName, originalFormat]);
 
   // ------------------------------------------------------------------
   // Reset
@@ -110,7 +130,7 @@ export default function ImageEditPage() {
 
   const reset = useCallback(() => {
     setImage(null);
-    setPreviewUrl(null);
+    setImageUrl(null);
     setFileName('');
     setAdjustments({ ...DEFAULT_ADJUSTMENTS });
     setActiveFilter(FILTER_PRESETS[0]);
@@ -165,25 +185,49 @@ export default function ImageEditPage() {
       )}
 
       {/* Editor */}
-      {image && previewUrl && (
+      {image && imageUrl && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_280px]">
           {/* Preview area */}
           <div className="rounded-xl border border-border bg-card p-4">
-            <div ref={imageContainerRef} className="relative flex justify-center">
-              <img
-                src={previewUrl}
-                alt="Preview"
-                className="max-h-[65vh] w-auto rounded-lg"
-                draggable={false}
-              />
-              <CropOverlay
-                imageWidth={displaySize.width}
-                imageHeight={displaySize.height}
-                naturalWidth={image.naturalWidth}
-                naturalHeight={image.naturalHeight}
-                onCropChange={setCropRect}
-                active={activeTab === 'crop'}
-              />
+            <div ref={imageContainerRef} className="flex justify-center">
+              <div className="relative inline-block">
+                <img
+                  ref={imgRef}
+                  src={imageUrl}
+                  alt="Preview"
+                  className="max-h-[65vh] w-auto rounded-lg"
+                  draggable={false}
+                  style={{ filter: previewFilter }}
+                />
+                {/* Vignette overlay */}
+                {mergedVignette > 0 && (
+                  <div
+                    className="absolute inset-0 rounded-lg pointer-events-none"
+                    style={{
+                      background: `radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,${mergedVignette / 100}) 100%)`,
+                    }}
+                  />
+                )}
+                {/* Filter color overlay */}
+                {activeFilter.overlay && (
+                  <div
+                    className="absolute inset-0 rounded-lg pointer-events-none"
+                    style={{
+                      backgroundColor: activeFilter.overlay.color,
+                      opacity: activeFilter.overlay.opacity,
+                      mixBlendMode: activeFilter.overlay.blendMode as React.CSSProperties['mixBlendMode'],
+                    }}
+                  />
+                )}
+                <CropOverlay
+                  imageWidth={displaySize.width}
+                  imageHeight={displaySize.height}
+                  naturalWidth={image.naturalWidth}
+                  naturalHeight={image.naturalHeight}
+                  onCropChange={setCropRect}
+                  active={activeTab === 'crop'}
+                />
+              </div>
             </div>
           </div>
 
@@ -222,9 +266,10 @@ export default function ImageEditPage() {
                   activeFilter={activeFilter.id}
                   onFilterChange={(preset) => {
                     setActiveFilter(preset);
-                    // Also update adjustments to match the filter
                     if (preset.id === 'original') {
                       setAdjustments({ ...DEFAULT_ADJUSTMENTS });
+                    } else if (preset.adjustments) {
+                      setAdjustments(prev => ({ ...prev, ...preset.adjustments }));
                     }
                   }}
                 />

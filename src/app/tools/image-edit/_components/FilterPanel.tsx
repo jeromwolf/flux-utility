@@ -20,11 +20,23 @@ export function FilterPanel({ image, activeFilter, onFilterChange }: FilterPanel
     generatedForRef.current = image;
 
     const map = new Map<string, string>();
-    for (const preset of FILTER_PRESETS) {
+    let index = 0;
+
+    const generateNext = () => {
+      if (index >= FILTER_PRESETS.length) {
+        setPreviews(new Map(map));
+        return;
+      }
+      const preset = FILTER_PRESETS[index];
       const canvas = generateFilterPreview(image, preset, 80);
       map.set(preset.id, canvas.toDataURL('image/jpeg', 0.7));
-    }
-    setPreviews(map);
+      index++;
+      // Set intermediate previews so they appear one by one
+      setPreviews(new Map(map));
+      requestAnimationFrame(generateNext);
+    };
+
+    requestAnimationFrame(generateNext);
   }, [image]);
 
   return (
