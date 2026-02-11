@@ -41,10 +41,10 @@ export default function PdfAnnotatePage() {
   >(new Map());
 
   // Tool state
-  const [activeTool, setActiveTool] = useState<AnnotationTool>('pen');
+  const [activeTool, setActiveTool] = useState<AnnotationTool>('highlight');
   const [color, setColor] = useState('#000000');
-  const [strokeWidth, setStrokeWidth] = useState(4);
-  const [fontSize, setFontSize] = useState(24);
+  const [strokeWidth, setStrokeWidth] = useState(8);
+  const [fontSize, setFontSize] = useState(36);
 
   // ------------------------------------------------------------------
   // File handling

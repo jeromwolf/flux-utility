@@ -4,7 +4,7 @@ import { jsPDF } from 'jspdf';
 // Types
 // ---------------------------------------------------------------------------
 
-export type AnnotationTool = 'pen' | 'highlight' | 'text' | 'eraser';
+export type AnnotationTool = 'pen' | 'highlight' | 'text' | 'eraser' | 'rect' | 'circle' | 'arrow' | 'line';
 
 export interface PenStroke {
   tool: 'pen';
@@ -35,11 +35,55 @@ export interface EraserStroke {
   width: number;
 }
 
+export interface RectAnnotation {
+  tool: 'rect';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: string;
+  lineWidth: number;
+}
+
+export interface CircleAnnotation {
+  tool: 'circle';
+  cx: number;
+  cy: number;
+  rx: number;
+  ry: number;
+  color: string;
+  lineWidth: number;
+}
+
+export interface ArrowAnnotation {
+  tool: 'arrow';
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  color: string;
+  lineWidth: number;
+}
+
+export interface LineAnnotation {
+  tool: 'line';
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  color: string;
+  lineWidth: number;
+}
+
 export type Annotation =
   | PenStroke
   | HighlightStroke
   | TextAnnotation
-  | EraserStroke;
+  | EraserStroke
+  | RectAnnotation
+  | CircleAnnotation
+  | ArrowAnnotation
+  | LineAnnotation;
 
 // ---------------------------------------------------------------------------
 // Drawing helpers
@@ -109,6 +153,66 @@ export function drawStroke(
     ctx.fillStyle = annotation.color;
     ctx.font = `${annotation.fontSize}px sans-serif`;
     ctx.fillText(annotation.text, annotation.x, annotation.y);
+  }
+
+  if (annotation.tool === 'rect') {
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = annotation.color;
+    ctx.lineWidth = annotation.lineWidth;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeRect(annotation.x, annotation.y, annotation.width, annotation.height);
+  }
+
+  if (annotation.tool === 'circle') {
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = annotation.color;
+    ctx.lineWidth = annotation.lineWidth;
+    ctx.beginPath();
+    ctx.ellipse(annotation.cx, annotation.cy, Math.abs(annotation.rx), Math.abs(annotation.ry), 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  if (annotation.tool === 'arrow') {
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = annotation.color;
+    ctx.fillStyle = annotation.color;
+    ctx.lineWidth = annotation.lineWidth;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Draw line
+    ctx.beginPath();
+    ctx.moveTo(annotation.startX, annotation.startY);
+    ctx.lineTo(annotation.endX, annotation.endY);
+    ctx.stroke();
+
+    // Draw arrowhead
+    const angle = Math.atan2(annotation.endY - annotation.startY, annotation.endX - annotation.startX);
+    const headLen = annotation.lineWidth * 4;
+    ctx.beginPath();
+    ctx.moveTo(annotation.endX, annotation.endY);
+    ctx.lineTo(
+      annotation.endX - headLen * Math.cos(angle - Math.PI / 6),
+      annotation.endY - headLen * Math.sin(angle - Math.PI / 6)
+    );
+    ctx.lineTo(
+      annotation.endX - headLen * Math.cos(angle + Math.PI / 6),
+      annotation.endY - headLen * Math.sin(angle + Math.PI / 6)
+    );
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  if (annotation.tool === 'line') {
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = annotation.color;
+    ctx.lineWidth = annotation.lineWidth;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(annotation.startX, annotation.startY);
+    ctx.lineTo(annotation.endX, annotation.endY);
+    ctx.stroke();
   }
 
   ctx.restore();

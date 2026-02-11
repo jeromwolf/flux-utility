@@ -1,6 +1,6 @@
 'use client';
 
-import { Pencil, Highlighter, Type, Eraser, Undo2, Redo2 } from 'lucide-react';
+import { Pencil, Highlighter, Type, Eraser, Undo2, Redo2, Square, Circle, MoveRight, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AnnotationTool } from '@/lib/pdf/pdf-annotator';
 
@@ -22,6 +22,10 @@ interface ToolbarProps {
 const TOOLS: { tool: AnnotationTool; icon: typeof Pencil; label: string }[] = [
   { tool: 'pen', icon: Pencil, label: '펜' },
   { tool: 'highlight', icon: Highlighter, label: '형광펜' },
+  { tool: 'line', icon: Minus, label: '직선' },
+  { tool: 'arrow', icon: MoveRight, label: '화살표' },
+  { tool: 'rect', icon: Square, label: '사각형' },
+  { tool: 'circle', icon: Circle, label: '원' },
   { tool: 'text', icon: Type, label: '텍스트' },
   { tool: 'eraser', icon: Eraser, label: '지우개' },
 ];
@@ -29,15 +33,15 @@ const TOOLS: { tool: AnnotationTool; icon: typeof Pencil; label: string }[] = [
 const PRESET_COLORS = ['#000000', '#ef4444', '#3b82f6', '#22c55e', '#eab308'];
 
 const WIDTHS: { value: number; size: number; label: string }[] = [
-  { value: 2, size: 8, label: '가늘게' },
-  { value: 4, size: 12, label: '보통' },
-  { value: 8, size: 16, label: '굵게' },
+  { value: 4, size: 8, label: '가늘게' },
+  { value: 8, size: 14, label: '보통' },
+  { value: 16, size: 20, label: '굵게' },
 ];
 
 const FONT_SIZES: { value: number; label: string }[] = [
-  { value: 16, label: 'S' },
-  { value: 24, label: 'M' },
-  { value: 36, label: 'L' },
+  { value: 24, label: 'S' },
+  { value: 36, label: 'M' },
+  { value: 48, label: 'L' },
 ];
 
 export function Toolbar({
